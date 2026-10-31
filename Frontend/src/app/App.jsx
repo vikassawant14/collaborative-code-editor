@@ -158,8 +158,14 @@ function App() {
       <aside className="h-full w-2/5 bg-amber-50 rounded-lg p-4 overflow-y-auto">
 
         <h2 className="text-2xl font-bold text-gray-950">
-          Welcome, {username}
-        </h2>
+  Welcome, {username}
+</h2>
+
+{  /* Live Collaboration Status */}
+   <div className="collaboration-status">
+     <span className="status-dot"></span>
+     Live Collaboration Enabled
+   </div>
 
         <h3 className="mt-6 mb-3 font-bold text-gray-800">
           Connected Users ({users.length})

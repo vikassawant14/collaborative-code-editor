@@ -1,2 +1,23 @@
 
 @import "tailwindcss";
+
+/* Live Collaboration Status */
+.collaboration-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-top: 12px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  background: #2e7d32;
+  border-radius: 50%;
+}
