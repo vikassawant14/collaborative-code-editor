@@ -1,63 +1,148 @@
 
-import React, { useMemo, useState, useEffect } from "react";
-
+import React, { useEffect, useMemo, useState } from "react";
 import "./App.css";
+
 import Editor from "@monaco-editor/react";
 import { MonacoBinding } from "y-monaco";
 import * as Y from "yjs";
 import { SocketIOProvider } from "y-socket.io";
+import { io } from "socket.io-client";
+
+import VideoCall from "./VideoCall";
 
 function App() {
+  // Backend URL
+  const SERVER_URL = import.meta.env.DEV
+    ? "http://localhost:3000"
+    : window.location.origin;
+
   const ydoc = useMemo(() => new Y.Doc(), []);
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc]);
 
   const [editor, setEditor] = useState(null);
-  const [users, setUsers] = useState([]);
+  const [username, setUsername] = useState("");
+  const [roomId, setRoomId] = useState("");
+  const [joined, setJoined] = useState(false);
 
-  const [roomId, setRoomId] = useState(() => {
-    return new URLSearchParams(window.location.search).get("room") || "monaco";
-  });
+  const [role, setRole] = useState("");
+  const [participants, setParticipants] = useState([]);
 
-  const [username, setUsername] = useState(() => {
-    return (
-      new URLSearchParams(window.location.search).get("username") || ""
-    );
-  });
+  const [interviewSocket, setInterviewSocket] = useState(null);
+
+  const [error, setError] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
 
   // Join form
-  const handleJoin = (e) => {
-    e.preventDefault();
+  const handleJoin = (event) => {
+    event.preventDefault();
 
-    const name = e.target.username.value.trim();
-    const room = e.target.room.value.trim();
+    const name = event.target.username.value.trim();
+    const room = event.target.room.value.trim();
 
     if (!name || !room) return;
 
-    const params = new URLSearchParams(window.location.search);
-    params.set("username", name);
-    params.set("room", room);
+    if (!/^[a-zA-Z0-9_-]{3,40}$/.test(room)) {
+      setError(
+        "Room ID must contain 3-40 letters, numbers, _ or -."
+      );
+      return;
+    }
 
-    window.history.pushState(
-      {},
-      "",
-      `${window.location.pathname}?${params.toString()}`
+    setError("");
+    setUsername(name);
+    setRoomId(room);
+  };
+
+  // Interview Socket.IO connection
+  useEffect(() => {
+    if (!username || !roomId) return;
+
+    const socket = io(SERVER_URL, {
+      autoConnect: false,
+      transports: ["websocket", "polling"],
+    });
+
+    socket.on("connect", () => {
+      socket.emit("interview:join", {
+        roomId,
+        username,
+      });
+    });
+
+    socket.on("interview:joined", (data) => {
+      setRole(data.participant.role);
+      setParticipants(data.participants);
+      setInterviewSocket(socket);
+      setJoined(true);
+      setError("");
+
+      const params = new URLSearchParams();
+      params.set("room", roomId);
+
+      window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}?${params.toString()}`
+      );
+    });
+
+    socket.on("interview:error", (data) => {
+      setError(data.message || "Unable to join room.");
+      setUsername("");
+      setJoined(false);
+      socket.disconnect();
+    });
+
+    socket.on(
+      "interview:participant-joined",
+      ({ participant }) => {
+        setParticipants((previous) => {
+          if (
+            previous.some(
+              (user) => user.id === participant.id
+            )
+          ) {
+            return previous;
+          }
+
+          return [...previous, participant];
+        });
+      }
     );
 
-    setRoomId(room);
-    setUsername(name);
-  };
+    socket.on(
+      "interview:participant-left",
+      ({ socketId }) => {
+        setParticipants((previous) =>
+          previous.filter((user) => user.id !== socketId)
+        );
+      }
+    );
 
-  // Monaco Editor mount
-  const handleMount = (editorInstance) => {
-    setEditor(editorInstance);
-  };
+    socket.on("interview:chat", (data) => {
+      setMessages((previous) => [...previous, data]);
+    });
 
-  // Connect Yjs and Socket.IO
+    socket.on("connect_error", () => {
+      setError("Cannot connect to the interview server.");
+    });
+
+    socket.connect();
+
+    return () => {
+      socket.disconnect();
+      setInterviewSocket(null);
+      setJoined(false);
+    };
+  }, [username, roomId, SERVER_URL]);
+
+  // Yjs collaborative editor connection
   useEffect(() => {
-    if (!username || !editor) return;
+    if (!joined || !interviewSocket || !editor) return;
 
     const provider = new SocketIOProvider(
-      window.location.origin,
+      SERVER_URL,
       roomId,
       ydoc,
       {
@@ -65,17 +150,15 @@ function App() {
       }
     );
 
-    // Share username with other connected users
     provider.awareness.setLocalStateField("user", {
-      username: username,
+      username,
+      role,
     });
 
-    // Get Monaco model
     const model = editor.getModel();
 
     let binding = null;
 
-    // Bind Monaco Editor with Yjs
     if (model) {
       binding = new MonacoBinding(
         yText,
@@ -85,36 +168,22 @@ function App() {
       );
     }
 
-    // Update connected users
-    const updateUsers = () => {
-      const states = Array.from(
-        provider.awareness.getStates().values()
-      );
-
-      const connectedUsers = states
-        .map((state) => state.user)
-        .filter((user) => user && user.username);
-
-      setUsers(connectedUsers);
-    };
-
-    provider.awareness.on("change", updateUsers);
-
-    updateUsers();
-
-    // Cleanup connection
     return () => {
-      provider.awareness.off("change", updateUsers);
-
       binding?.destroy();
-
       provider.awareness.setLocalState(null);
-
       provider.disconnect();
-
-      setUsers([]);
     };
-  }, [username, editor, ydoc, yText, roomId]);
+  }, [
+    joined,
+    interviewSocket,
+    editor,
+    SERVER_URL,
+    roomId,
+    username,
+    role,
+    ydoc,
+    yText,
+  ]);
 
   // Destroy Yjs document
   useEffect(() => {
@@ -123,121 +192,225 @@ function App() {
     };
   }, [ydoc]);
 
-  // Join screen
-  if (!username) {
-    return (
-      <main className="h-screen w-full bg-gray-950 flex items-center justify-center p-4">
+  // Send chat message
+  const sendMessage = (event) => {
+    event.preventDefault();
 
+    const message = chatInput.trim();
+
+    if (!message || !interviewSocket) return;
+
+    const data = {
+      username,
+      message,
+      time: new Date().toISOString(),
+    };
+
+    setMessages((previous) => [...previous, data]);
+
+    interviewSocket.emit("interview:chat", {
+      message,
+    });
+
+    setChatInput("");
+  };
+
+  // Copy room link
+  const copyRoomLink = async () => {
+    const link =
+      `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(roomId)}`;
+
+    try {
+      await navigator.clipboard.writeText(link);
+      alert("Room link copied!");
+    } catch {
+      setError("Unable to copy room link.");
+    }
+  };
+
+  // Join screen
+  if (!username || !joined) {
+    return (
+      <main className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <form
           onSubmit={handleJoin}
-          className="flex flex-col gap-4 w-full max-w-sm"
+          className="flex flex-col gap-4 w-full max-w-sm bg-gray-900 p-6 rounded-xl"
         >
           <h1 className="text-2xl text-white font-bold text-center">
-            Join Collaboration
+            Technical Interview
           </h1>
 
+          <p className="text-gray-400 text-center text-sm">
+            Collaborative coding interview room
+          </p>
+
           <input
-            type="text"
-            placeholder="Enter your name"
-            className="p-3 rounded-lg bg-gray-800 text-white outline-none"
             name="username"
+            placeholder="Enter your name"
+            maxLength={30}
             required
+            className="p-3 rounded-lg bg-gray-800 text-white outline-none"
           />
 
           <input
-            type="text"
-            placeholder="Enter Room ID"
             name="room"
-            defaultValue={roomId}
-            className="p-3 rounded-lg bg-gray-800 text-white outline-none"
+            placeholder="Enter Room ID"
+            defaultValue={
+              new URLSearchParams(
+                window.location.search
+              ).get("room") || ""
+            }
+            minLength={3}
+            maxLength={40}
             required
+            className="p-3 rounded-lg bg-gray-800 text-white outline-none"
           />
+
+          {error && (
+            <p className="text-red-400 text-sm">
+              {error}
+            </p>
+          )}
 
           <button
             type="submit"
             className="p-3 rounded-lg bg-amber-50 text-gray-950 font-bold"
           >
-            Join
+            Join Interview
           </button>
-
         </form>
-
       </main>
     );
   }
 
-  // Collaborative editor screen
+  // Interview screen
   return (
-    <main className="h-screen w-full bg-gray-950 flex gap-4 p-4">
+    <main className="min-h-screen bg-gray-950 text-white p-3">
+      <header className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div>
+          <h1 className="text-xl font-bold">
+            Technical Interview
+          </h1>
 
-      {/* Sidebar */}
-      <aside className="h-full w-2/5 bg-amber-50 rounded-lg p-4 overflow-y-auto">
-
-        <h2 className="text-2xl font-bold text-gray-950">
-          Welcome, {username}
-        </h2>
-
-        {/* Live Collaboration Status */}
-        <div className="collaboration-status">
-          <span className="status-dot"></span>
-          Live Collaboration Enabled
+          <p className="text-sm text-gray-400">
+            Room: {roomId} | Role: {role}
+          </p>
         </div>
 
-        {/* Collaboration Room */}
-        <div className="mt-3 p-3 bg-gray-800 text-white rounded-lg">
-          <p className="text-sm text-gray-300">
-            Collaboration Room
-          </p>
+        <button
+          onClick={copyRoomLink}
+          className="bg-blue-600 px-4 py-2 rounded-lg"
+        >
+          Copy Room Link
+        </button>
+      </header>
 
-          <p className="font-bold break-all">
-            {roomId}
-          </p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
 
-          <button
-            onClick={() =>
-              navigator.clipboard.writeText(
-                `${window.location.origin}?room=${encodeURIComponent(roomId)}`
-              )
-            }
-            className="mt-2 px-3 py-2 bg-blue-600 rounded-lg text-white"
-          >
-            Copy Room Link
-          </button>
-        </div>
+        {/* Monaco Editor */}
+        <section className="lg:col-span-2 bg-neutral-900 rounded-xl overflow-hidden">
+          <div className="p-3 border-b border-gray-700 font-semibold">
+            Live Code Editor
+          </div>
 
-        <h3 className="mt-6 mb-3 font-bold text-gray-800">
-          Connected Users ({users.length})
-        </h3>
+          <Editor
+            height="70vh"
+            defaultLanguage="javascript"
+            defaultValue="// Start coding here..."
+            theme="vs-dark"
+            onMount={(instance) => setEditor(instance)}
+          />
+        </section>
 
-        <ul className="flex flex-col gap-2">
-          {users.map((user, index) => (
-            <li
-              key={`${user.username}-${index}`}
-              className="p-3 bg-gray-800 text-white rounded-lg"
+        {/* Interview Sidebar */}
+        <aside className="flex flex-col gap-3">
+
+          {/* Participants */}
+          <section className="bg-white text-gray-900 rounded-xl p-3">
+            <h2 className="font-bold mb-2">
+              Participants ({participants.length}/2)
+            </h2>
+
+            {participants.map((participant) => (
+              <div
+                key={participant.id}
+                className="bg-gray-100 rounded-lg p-2 mb-2"
+              >
+                <p className="font-semibold">
+                  {participant.username}
+                </p>
+
+                <p className="text-sm text-gray-600">
+                  {participant.role}
+                </p>
+              </div>
+            ))}
+          </section>
+
+          {/* Video and Audio */}
+          <section className="bg-white text-gray-900 rounded-xl p-3">
+            <VideoCall
+              socket={interviewSocket}
+              role={role}
+              participantCount={participants.length}
+            />
+          </section>
+
+          {/* Chat */}
+          <section className="bg-white text-gray-900 rounded-xl p-3">
+            <h2 className="font-bold mb-2">
+              Interview Chat
+            </h2>
+
+            <div className="h-48 overflow-y-auto bg-gray-100 rounded-lg p-2 mb-3">
+              {messages.map((message, index) => (
+                <div
+                  key={`${message.time}-${index}`}
+                  className="mb-2"
+                >
+                  <p className="text-xs font-bold">
+                    {message.username}
+                  </p>
+
+                  <p className="text-sm break-words">
+                    {message.message}
+                  </p>
+                </div>
+              ))}
+
+              {messages.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  No messages yet.
+                </p>
+              )}
+            </div>
+
+            <form
+              onSubmit={sendMessage}
+              className="flex gap-2"
             >
-              {user.username}
-            </li>
-          ))}
-        </ul>
+              <input
+                value={chatInput}
+                onChange={(event) =>
+                  setChatInput(event.target.value)
+                }
+                placeholder="Type a message..."
+                maxLength={1000}
+                className="min-w-0 flex-1 border rounded-lg p-2"
+              />
 
-      </aside>
-
-      {/* Monaco Editor */}
-      <section className="flex-1 min-w-0 bg-neutral-800 rounded-lg overflow-hidden">
-
-        <Editor
-          height="100%"
-          defaultLanguage="javascript"
-          defaultValue="// Start coding here..."
-          theme="vs-dark"
-          onMount={handleMount}
-        />
-
-      </section>
-
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-3 rounded-lg"
+              >
+                Send
+              </button>
+            </form>
+          </section>
+        </aside>
+      </div>
     </main>
   );
 }
 
 export default App;
-
