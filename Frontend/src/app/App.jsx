@@ -14,6 +14,10 @@ function App() {
   const [editor, setEditor] = useState(null);
   const [users, setUsers] = useState([]);
 
+  const [roomId, setRoomId] = useState(() => {
+    return new URLSearchParams(window.location.search).get("room") || "monaco";
+  });
+
   const [username, setUsername] = useState(() => {
     return (
       new URLSearchParams(window.location.search).get("username") || ""
@@ -25,11 +29,13 @@ function App() {
     e.preventDefault();
 
     const name = e.target.username.value.trim();
+    const room = e.target.room.value.trim();
 
-    if (!name) return;
+    if (!name || !room) return;
 
     const params = new URLSearchParams(window.location.search);
     params.set("username", name);
+    params.set("room", room);
 
     window.history.pushState(
       {},
@@ -37,6 +43,7 @@ function App() {
       `${window.location.pathname}?${params.toString()}`
     );
 
+    setRoomId(room);
     setUsername(name);
   };
 
@@ -49,14 +56,14 @@ function App() {
   useEffect(() => {
     if (!username || !editor) return;
 
-  const provider = new SocketIOProvider(
-  window.location.origin,
-  "monaco",
-  ydoc,
-  {
-    autoConnect: true,
-  }
-);
+    const provider = new SocketIOProvider(
+      window.location.origin,
+      roomId,
+      ydoc,
+      {
+        autoConnect: true,
+      }
+    );
 
     // Share username with other connected users
     provider.awareness.setLocalStateField("user", {
@@ -107,7 +114,7 @@ function App() {
 
       setUsers([]);
     };
-  }, [username, editor, ydoc, yText]);
+  }, [username, editor, ydoc, yText, roomId]);
 
   // Destroy Yjs document
   useEffect(() => {
@@ -137,6 +144,15 @@ function App() {
             required
           />
 
+          <input
+            type="text"
+            placeholder="Enter Room ID"
+            name="room"
+            defaultValue={roomId}
+            className="p-3 rounded-lg bg-gray-800 text-white outline-none"
+            required
+          />
+
           <button
             type="submit"
             className="p-3 rounded-lg bg-amber-50 text-gray-950 font-bold"
@@ -158,14 +174,36 @@ function App() {
       <aside className="h-full w-2/5 bg-amber-50 rounded-lg p-4 overflow-y-auto">
 
         <h2 className="text-2xl font-bold text-gray-950">
-  Welcome, {username}
-</h2>
+          Welcome, {username}
+        </h2>
 
-{  /* Live Collaboration Status */}
-   <div className="collaboration-status">
-     <span className="status-dot"></span>
-     Live Collaboration Enabled
-   </div>
+        {/* Live Collaboration Status */}
+        <div className="collaboration-status">
+          <span className="status-dot"></span>
+          Live Collaboration Enabled
+        </div>
+
+        {/* Collaboration Room */}
+        <div className="mt-3 p-3 bg-gray-800 text-white rounded-lg">
+          <p className="text-sm text-gray-300">
+            Collaboration Room
+          </p>
+
+          <p className="font-bold break-all">
+            {roomId}
+          </p>
+
+          <button
+            onClick={() =>
+              navigator.clipboard.writeText(
+                `${window.location.origin}?room=${encodeURIComponent(roomId)}`
+              )
+            }
+            className="mt-2 px-3 py-2 bg-blue-600 rounded-lg text-white"
+          >
+            Copy Room Link
+          </button>
+        </div>
 
         <h3 className="mt-6 mb-3 font-bold text-gray-800">
           Connected Users ({users.length})
