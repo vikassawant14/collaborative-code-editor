@@ -175,7 +175,7 @@ function App() {
           {users.map((user, index) => (
             <li
               key={`${user.username}-${index}`}
-              className="p-3 bg-gray-900 text-white rounded-lg"
+              className="p-3 bg-green-800 text-white rounded-lg"
             >
               {user.username}
             </li>
