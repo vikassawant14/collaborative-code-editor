@@ -1,4 +1,141 @@
+
 @import "tailwindcss";
+
+/* ===== Main Theme ===== */
+
+body {
+  background: #0b0f14;
+  color: #f9fafb;
+}
+
+/* Main application background */
+.bg-gray-950 {
+  background-color: #0b0f14 !important;
+}
+
+/* Sidebar and cards */
+.bg-white {
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+  border: 1px solid #263445;
+  border-radius: 14px;
+}
+
+/* Editor and video backgrounds */
+.bg-neutral-900,
+.bg-gray-900 {
+  background-color: #111827 !important;
+}
+
+/* Nested cards */
+.bg-gray-100 {
+  background-color: #1b2734 !important;
+  color: #f9fafb !important;
+}
+
+/* Inputs and secondary elements */
+.bg-gray-800 {
+  background-color: #182330 !important;
+  color: #f9fafb !important;
+}
+
+/* Text colors */
+.text-gray-900,
+.text-gray-800 {
+  color: #f9fafb !important;
+}
+
+.text-gray-600,
+.text-gray-500,
+.text-gray-400 {
+  color: #9ca3af !important;
+}
+
+/* ===== Buttons ===== */
+
+.bg-blue-600 {
+  background-color: #059669 !important;
+  color: white !important;
+  transition: background-color 0.2s ease;
+}
+
+.bg-blue-600:hover {
+  background-color: #047857 !important;
+}
+
+.bg-amber-50 {
+  background-color: #10b981 !important;
+  color: #ffffff !important;
+}
+
+/* Video controls */
+button {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== Cards ===== */
+
+.rounded-xl,
+.rounded-lg {
+  border-radius: 12px;
+}
+
+/* Borders */
+.border-gray-700 {
+  border-color: #263445 !important;
+}
+
+/* ===== Video Section ===== */
+
+video {
+  background: #0b0f14;
+  border: 1px solid #334155;
+  border-radius: 10px;
+}
+
+/* ===== Chat ===== */
+
+input {
+  background-color: #182330;
+  color: #ffffff;
+  border-color: #334155;
+}
+
+input::placeholder {
+  color: #9ca3af;
+}
+
+input:focus {
+  outline: 1px solid #10b981;
+  border-color: #10b981;
+}
+
+/* ===== Scrollbar ===== */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0b0f14;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #10b981;
+}
+
+/* ===== Collaboration Status ===== */
 
 .collaboration-status {
   display: inline-flex;
@@ -6,8 +143,8 @@
   gap: 8px;
   padding: 8px 14px;
   margin-top: 12px;
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: #064e3b;
+  color: #6ee7b7;
   border-radius: 20px;
   font-size: 14px;
   font-weight: 600;
@@ -16,6 +153,6 @@
 .status-dot {
   width: 9px;
   height: 9px;
-  background: #2e7d32;
+  background: #10b981;
   border-radius: 50%;
 }
