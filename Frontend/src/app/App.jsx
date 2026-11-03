@@ -7,8 +7,56 @@ import { MonacoBinding } from "y-monaco";
 import * as Y from "yjs";
 import { SocketIOProvider } from "y-socket.io";
 import { io } from "socket.io-client";
-
 import VideoCall from "./VideoCall";
+
+// Interview House Logo
+
+function InterviewHouseLogo() {
+  return (
+    <div
+      style={{
+        width: "100%",
+        background: "#0b0f14",
+        borderRadius: "18px",
+        padding: "24px 12px",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        boxSizing: "border-box",
+      }}
+    >
+      <h1
+        style={{
+          margin: 0,
+          color: "#ffffff",
+          fontFamily: "Arial, Helvetica, sans-serif",
+          fontSize: "34px",
+          fontWeight: 900,
+          letterSpacing: "-1px",
+          lineHeight: 1.2,
+        }}
+      >
+        interve
+        <span style={{ position: "relative" }}>
+          i
+          <span
+            style={{
+              position: "absolute",
+              top: "2px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "6px",
+              height: "6px",
+              background: "#ed1c24",
+              borderRadius: "50%",
+            }}
+          />
+        </span>
+        w-house
+      </h1>
+    </div>
+  );
+}
 
 function App() {
   // Backend URL
@@ -236,9 +284,9 @@ function App() {
           onSubmit={handleJoin}
           className="flex flex-col gap-4 w-full max-w-sm bg-gray-900 p-6 rounded-xl"
         >
-          <h1 className="text-2xl text-white font-bold text-center">
-            Technical Interview
-          </h1>
+          <div className="text-center mb-2">
+            <InterviewHouseLogo size="38px" />
+          </div>
 
           <p className="text-gray-400 text-center text-sm">
             Collaborative coding interview room
@@ -288,11 +336,9 @@ function App() {
     <main className="min-h-screen bg-gray-950 text-white p-3">
       <header className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
-          <h1 className="text-xl font-bold">
-            Technical Interview
-          </h1>
+          <InterviewHouseLogo size="30px" />
 
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-400 mt-2">
             Room: {roomId} | Role: {role}
           </p>
         </div>
