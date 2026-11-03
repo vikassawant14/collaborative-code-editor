@@ -11,52 +11,6 @@ import VideoCall from "./VideoCall";
 
 // Interview House Logo
 
-function InterviewHouseLogo() {
-  return (
-    <div
-      style={{
-        width: "100%",
-        background: "#0b0f14",
-        borderRadius: "18px",
-        padding: "24px 12px",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        boxSizing: "border-box",
-      }}
-    >
-      <h1
-        style={{
-          margin: 0,
-          color: "#ffffff",
-          fontFamily: "Arial, Helvetica, sans-serif",
-          fontSize: "34px",
-          fontWeight: 900,
-          letterSpacing: "-1px",
-          lineHeight: 1.2,
-        }}
-      >
-        interve
-        <span style={{ position: "relative" }}>
-          i
-          <span
-            style={{
-              position: "absolute",
-              top: "2px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: "6px",
-              height: "6px",
-              background: "#ed1c24",
-              borderRadius: "50%",
-            }}
-          />
-        </span>
-        w-house
-      </h1>
-    </div>
-  );
-}
 
 function App() {
   // Backend URL
