@@ -156,3 +156,143 @@ input:focus {
   background: #10b981;
   border-radius: 50%;
 }
+
+/* Code / Draw workspace */
+.workspace-panel {
+  border: 1px solid #263445;
+  min-width: 0;
+}
+
+.workspace-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px;
+  background: #0b0f14;
+  border-bottom: 1px solid #263445;
+}
+
+.workspace-tab {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 9px 18px;
+  background: #182330;
+  color: #d1d5db;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workspace-tab.active {
+  color: #052e24;
+  background: #10b981;
+  border-color: #10b981;
+}
+
+.workspace-content {
+  min-width: 0;
+}
+
+.clipboard-note {
+  float: right;
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* Whiteboard */
+.whiteboard-wrap {
+  background: #111827;
+  padding: 12px;
+}
+
+.whiteboard-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+.whiteboard-tool-group,
+.whiteboard-actions,
+.whiteboard-colors {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.whiteboard-tool {
+  border: 1px solid #475569;
+  border-radius: 7px;
+  background: #1b2734;
+  color: #f9fafb;
+  padding: 7px 11px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.whiteboard-tool.selected {
+  border-color: #10b981;
+  color: #6ee7b7;
+  background: #064e3b;
+}
+
+.whiteboard-tool.danger {
+  border-color: #7f1d1d;
+  color: #fecaca;
+}
+
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+}
+
+.color-swatch.selected {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+.whiteboard-size {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #d1d5db;
+  font-size: 13px;
+}
+
+.whiteboard-size input {
+  width: 85px;
+  accent-color: #10b981;
+}
+
+.whiteboard-canvas {
+  display: block;
+  width: 100%;
+  height: 70vh;
+  min-height: 360px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.whiteboard-hint {
+  padding-top: 9px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .whiteboard-canvas {
+    height: 58vh;
+    min-height: 300px;
+  }
+
+  .clipboard-note {
+    display: none;
+  }
+}

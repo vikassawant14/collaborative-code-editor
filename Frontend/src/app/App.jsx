@@ -8,9 +8,7 @@ import * as Y from "yjs";
 import { SocketIOProvider } from "y-socket.io";
 import { io } from "socket.io-client";
 import VideoCall from "./VideoCall";
-
-// Interview House Logo
-
+import Whiteboard from "./Whiteboard";
 
 function App() {
   // Backend URL
@@ -20,6 +18,10 @@ function App() {
 
   const ydoc = useMemo(() => new Y.Doc(), []);
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc]);
+
+  // Code / Draw page state
+  const [activePage, setActivePage] = useState("code");
+  const [whiteboardStrokes, setWhiteboardStrokes] = useState([]);
 
   const [editor, setEditor] = useState(null);
   const [username, setUsername] = useState("");
@@ -75,6 +77,7 @@ function App() {
     socket.on("interview:joined", (data) => {
       setRole(data.participant.role);
       setParticipants(data.participants);
+      setWhiteboardStrokes(data.whiteboardStrokes || []);
       setInterviewSocket(socket);
       setJoined(true);
       setError("");
@@ -122,9 +125,56 @@ function App() {
       }
     );
 
+    // Receive chat messages
     socket.on("interview:chat", (data) => {
       setMessages((previous) => [...previous, data]);
     });
+
+    // --------------------------------
+    // WHITEBOARD SOCKET EVENTS
+    // --------------------------------
+
+    // Receive a new drawing stroke
+    socket.on("whiteboard:stroke-start", (stroke) => {
+      setWhiteboardStrokes((previous) => {
+        if (previous.some((item) => item.id === stroke.id)) {
+          return previous;
+        }
+
+        return [...previous, stroke];
+      });
+    });
+
+    // Receive drawing points
+    socket.on(
+      "whiteboard:stroke-point",
+      ({ strokeId, point }) => {
+        setWhiteboardStrokes((previous) =>
+          previous.map((stroke) =>
+            stroke.id === strokeId
+              ? {
+                  ...stroke,
+                  points: [...stroke.points, point],
+                }
+              : stroke
+          )
+        );
+      }
+    );
+
+    // Receive undo
+    socket.on("whiteboard:undo", () => {
+      setWhiteboardStrokes((previous) =>
+        previous.slice(0, -1)
+      );
+    });
+
+    // Receive clear
+    socket.on("whiteboard:clear", () => {
+      setWhiteboardStrokes([]);
+    });
+
+    // --------------------------------
 
     socket.on("connect_error", () => {
       setError("Cannot connect to the interview server.");
@@ -230,6 +280,41 @@ function App() {
     }
   };
 
+  // Disable copy, cut and paste inside Monaco
+  const handleEditorMount = (instance) => {
+    setEditor(instance);
+
+    const node = instance.getDomNode();
+    if (!node) return;
+
+    const blockClipboardKeys = (event) => {
+      const key = event.key.toLowerCase();
+      const modifier = event.ctrlKey || event.metaKey;
+
+      const blocked =
+        (modifier && ["c", "v", "x"].includes(key)) ||
+        (event.shiftKey && key === "insert") ||
+        (modifier && event.shiftKey && key === "v");
+
+      if (blocked) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
+    };
+
+    const blockClipboardEvent = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    node.addEventListener("keydown", blockClipboardKeys, true);
+    node.addEventListener("copy", blockClipboardEvent, true);
+    node.addEventListener("cut", blockClipboardEvent, true);
+    node.addEventListener("paste", blockClipboardEvent, true);
+    node.addEventListener("contextmenu", blockClipboardEvent, true);
+  };
+
   // Join screen
   if (!username || !joined) {
     return (
@@ -238,11 +323,11 @@ function App() {
           onSubmit={handleJoin}
           className="flex flex-col gap-4 w-full max-w-sm bg-gray-900 p-6 rounded-xl"
         >
-         <div className="text-center mb-2">
-  <h1 className="text-3xl font-bold text-white">
-    interview-house
-  </h1>
-</div>
+          <div className="text-center mb-2">
+            <h1 className="text-3xl font-bold text-white">
+              interview-house
+            </h1>
+          </div>
 
           <p className="text-gray-400 text-center text-sm">
             Collaborative coding interview room
@@ -292,9 +377,8 @@ function App() {
     <main className="min-h-screen bg-gray-950 text-white p-3">
       <header className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
-          
           <h1 className="text-2xl font-bold text-white">
-  interview-house
+            interview-house
           </h1>
 
           <p className="text-sm text-gray-400 mt-2">
@@ -312,19 +396,75 @@ function App() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
 
-        {/* Monaco Editor */}
-        <section className="lg:col-span-2 bg-neutral-900 rounded-xl overflow-hidden">
-          <div className="p-3 border-b border-gray-700 font-semibold">
-            Live Code Editor
+        {/* Code / Draw Workspace */}
+        <section className="lg:col-span-2 bg-neutral-900 rounded-xl overflow-hidden workspace-panel">
+
+          {/* Switch buttons */}
+          <div className="workspace-tabs">
+            <button
+              type="button"
+              className={`workspace-tab ${
+                activePage === "code" ? "active" : ""
+              }`}
+              onClick={() => setActivePage("code")}
+            >
+              {"</>"} Code
+            </button>
+
+            <button
+              type="button"
+              className={`workspace-tab ${
+                activePage === "draw" ? "active" : ""
+              }`}
+              onClick={() => setActivePage("draw")}
+            >
+              ✎ Draw
+            </button>
           </div>
 
-          <Editor
-            height="70vh"
-            defaultLanguage="javascript"
-            defaultValue="// Start coding here..."
-            theme="vs-dark"
-            onMount={(instance) => setEditor(instance)}
-          />
+          {/* Code page */}
+          <div
+            className="workspace-content"
+            style={{
+              display: activePage === "code" ? "block" : "none",
+            }}
+          >
+            <div className="p-3 border-b border-gray-700 font-semibold">
+              Live Code Editor
+
+              <span className="clipboard-note">
+                Copy and paste disabled
+              </span>
+            </div>
+
+            <Editor
+              height="70vh"
+              defaultLanguage="javascript"
+              defaultValue="// Start coding here..."
+              theme="vs-dark"
+              options={{
+                readOnly: false,
+                contextmenu: false,
+                selectOnLineNumbers: true,
+                automaticLayout: true,
+              }}
+              onMount={handleEditorMount}
+            />
+          </div>
+
+          {/* Drawing page */}
+          <div
+            className="workspace-content"
+            style={{
+              display: activePage === "draw" ? "block" : "none",
+            }}
+          >
+            <Whiteboard
+              socket={interviewSocket}
+              strokes={whiteboardStrokes}
+              setStrokes={setWhiteboardStrokes}
+            />
+          </div>
         </section>
 
         {/* Interview Sidebar */}
