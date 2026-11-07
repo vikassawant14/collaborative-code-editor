@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
@@ -23,7 +24,29 @@ function App() {
   const [activePage, setActivePage] = useState("code");
   const [whiteboardStrokes, setWhiteboardStrokes] = useState([]);
 
+  // Editor state
   const [editor, setEditor] = useState(null);
+
+  // Editor settings
+  const [editorTheme, setEditorTheme] = useState(
+    () => localStorage.getItem("editorTheme") || "vs-dark"
+  );
+
+  const [fontSize, setFontSize] = useState(
+    () => Number(localStorage.getItem("editorFontSize")) || 14
+  );
+
+  const [wordWrap, setWordWrap] = useState(
+    () => localStorage.getItem("editorWordWrap") || "on"
+  );
+
+  const [minimap, setMinimap] = useState(
+    () => localStorage.getItem("editorMinimap") !== "false"
+  );
+
+  const [showEditorSettings, setShowEditorSettings] = useState(false);
+
+  // Interview state
   const [username, setUsername] = useState("");
   const [roomId, setRoomId] = useState("");
   const [joined, setJoined] = useState(false);
@@ -36,6 +59,23 @@ function App() {
   const [error, setError] = useState("");
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
+
+  // Save editor preferences in browser
+  useEffect(() => {
+    localStorage.setItem("editorTheme", editorTheme);
+    localStorage.setItem("editorFontSize", String(fontSize));
+    localStorage.setItem("editorWordWrap", wordWrap);
+    localStorage.setItem("editorMinimap", String(minimap));
+  }, [editorTheme, fontSize, wordWrap, minimap]);
+
+  // Resize Monaco when switching pages or settings
+  useEffect(() => {
+    if (activePage === "code" && editor) {
+      requestAnimationFrame(() => {
+        editor.layout();
+      });
+    }
+  }, [activePage, editor, showEditorSettings]);
 
   // Join form
   const handleJoin = (event) => {
@@ -130,11 +170,8 @@ function App() {
       setMessages((previous) => [...previous, data]);
     });
 
-    // --------------------------------
     // WHITEBOARD SOCKET EVENTS
-    // --------------------------------
 
-    // Receive a new drawing stroke
     socket.on("whiteboard:stroke-start", (stroke) => {
       setWhiteboardStrokes((previous) => {
         if (previous.some((item) => item.id === stroke.id)) {
@@ -145,7 +182,6 @@ function App() {
       });
     });
 
-    // Receive drawing points
     socket.on(
       "whiteboard:stroke-point",
       ({ strokeId, point }) => {
@@ -162,19 +198,15 @@ function App() {
       }
     );
 
-    // Receive undo
     socket.on("whiteboard:undo", () => {
       setWhiteboardStrokes((previous) =>
         previous.slice(0, -1)
       );
     });
 
-    // Receive clear
     socket.on("whiteboard:clear", () => {
       setWhiteboardStrokes([]);
     });
-
-    // --------------------------------
 
     socket.on("connect_error", () => {
       setError("Cannot connect to the interview server.");
@@ -278,6 +310,14 @@ function App() {
     } catch {
       setError("Unable to copy room link.");
     }
+  };
+
+  // Reset editor settings
+  const resetEditorSettings = () => {
+    setEditorTheme("vs-dark");
+    setFontSize(14);
+    setWordWrap("on");
+    setMinimap(true);
   };
 
   // Disable copy, cut and paste inside Monaco
@@ -429,24 +469,129 @@ function App() {
               display: activePage === "code" ? "block" : "none",
             }}
           >
-            <div className="p-3 border-b border-gray-700 font-semibold">
-              Live Code Editor
+            {/* Editor header */}
+            <div className="editor-header">
+              <div className="editor-heading">
+                <span>Live Code Editor</span>
 
-              <span className="clipboard-note">
-                Copy and paste disabled
-              </span>
+                <span className="clipboard-note">
+                  Copy and paste disabled
+                </span>
+              </div>
+
+              <button
+                type="button"
+                className="editor-settings-button"
+                onClick={() =>
+                  setShowEditorSettings(!showEditorSettings)
+                }
+              >
+                ⚙ Editor Settings
+              </button>
             </div>
 
+            {/* Editor settings panel */}
+            {showEditorSettings && (
+              <div className="editor-settings-panel">
+
+                {/* Theme */}
+                <div className="editor-setting">
+                  <label>Editor Theme</label>
+
+                  <select
+                    value={editorTheme}
+                    onChange={(event) =>
+                      setEditorTheme(event.target.value)
+                    }
+                  >
+                    <option value="vs-dark">Dark</option>
+                    <option value="vs">Light</option>
+                  </select>
+                </div>
+
+                {/* Font size */}
+                <div className="editor-setting">
+                  <label>
+                    Font Size: {fontSize}px
+                  </label>
+
+                  <input
+                    type="range"
+                    min="10"
+                    max="28"
+                    value={fontSize}
+                    onChange={(event) =>
+                      setFontSize(Number(event.target.value))
+                    }
+                  />
+                </div>
+
+                {/* Word wrap */}
+                <div className="editor-setting">
+                  <label>Word Wrap</label>
+
+                  <select
+                    value={wordWrap}
+                    onChange={(event) =>
+                      setWordWrap(event.target.value)
+                    }
+                  >
+                    <option value="on">On</option>
+                    <option value="off">Off</option>
+                  </select>
+                </div>
+
+                {/* Minimap */}
+                <div className="editor-setting">
+                  <label>Minimap</label>
+
+                  <label className="editor-toggle">
+                    <input
+                      type="checkbox"
+                      checked={minimap}
+                      onChange={(event) =>
+                        setMinimap(event.target.checked)
+                      }
+                    />
+                    <span>
+                      {minimap ? "Enabled" : "Disabled"}
+                    </span>
+                  </label>
+                </div>
+
+                {/* Reset */}
+                <button
+                  type="button"
+                  className="editor-reset-button"
+                  onClick={resetEditorSettings}
+                >
+                  Reset Settings
+                </button>
+              </div>
+            )}
+
+            {/* Monaco Editor */}
             <Editor
               height="70vh"
               defaultLanguage="javascript"
               defaultValue="// Start coding here..."
-              theme="vs-dark"
+              theme={editorTheme}
               options={{
                 readOnly: false,
                 contextmenu: false,
                 selectOnLineNumbers: true,
                 automaticLayout: true,
+
+                fontSize: fontSize,
+                wordWrap: wordWrap,
+
+                minimap: {
+                  enabled: minimap,
+                },
+
+                scrollBeyondLastLine: false,
+                smoothScrolling: true,
+                tabSize: 2,
               }}
               onMount={handleEditorMount}
             />
