@@ -364,10 +364,10 @@ function App() {
           className="flex flex-col gap-4 w-full max-w-sm bg-gray-900 p-6 rounded-xl"
         >
           <div className="text-center mb-2">
-            <h1 className="text-3xl font-bold text-white">
-              interview-house
-            </h1>
-          </div>
+         <h1 className="text-3xl font-bold text-white">
+         <span style={{ color: "red" }}>i</span>nterview-house
+        </h1>
+         </div>
 
           <p className="text-gray-400 text-center text-sm">
             Collaborative coding interview room
@@ -418,7 +418,7 @@ function App() {
       <header className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
           <h1 className="text-2xl font-bold text-white">
-            interview-house
+            <span style={{ color: "red" }} >i</span>nterview-house
           </h1>
 
           <p className="text-sm text-gray-400 mt-2">
