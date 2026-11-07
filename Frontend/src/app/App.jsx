@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
@@ -8,11 +7,11 @@ import { MonacoBinding } from "y-monaco";
 import * as Y from "yjs";
 import { SocketIOProvider } from "y-socket.io";
 import { io } from "socket.io-client";
+
 import VideoCall from "./VideoCall";
 import Whiteboard from "./Whiteboard";
 
 function App() {
-  // Backend URL
   const SERVER_URL = import.meta.env.DEV
     ? "http://localhost:3000"
     : window.location.origin;
@@ -20,47 +19,44 @@ function App() {
   const ydoc = useMemo(() => new Y.Doc(), []);
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc]);
 
-  // Code / Draw page state
+  // Workspace
   const [activePage, setActivePage] = useState("code");
   const [whiteboardStrokes, setWhiteboardStrokes] = useState([]);
-
-  // Editor state
   const [editor, setEditor] = useState(null);
 
   // Editor settings
   const [editorTheme, setEditorTheme] = useState(
     () => localStorage.getItem("editorTheme") || "vs-dark"
   );
-
   const [fontSize, setFontSize] = useState(
     () => Number(localStorage.getItem("editorFontSize")) || 14
   );
-
   const [wordWrap, setWordWrap] = useState(
     () => localStorage.getItem("editorWordWrap") || "on"
   );
-
   const [minimap, setMinimap] = useState(
     () => localStorage.getItem("editorMinimap") !== "false"
   );
-
   const [showEditorSettings, setShowEditorSettings] = useState(false);
 
-  // Interview state
+  // Interview
   const [username, setUsername] = useState("");
   const [roomId, setRoomId] = useState("");
   const [joined, setJoined] = useState(false);
-
   const [role, setRole] = useState("");
   const [participants, setParticipants] = useState([]);
-
   const [interviewSocket, setInterviewSocket] = useState(null);
 
+  // Chat and UI
   const [error, setError] = useState("");
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
+  const [showParticipants, setShowParticipants] = useState(true);
+  const [activeNav, setActiveNav] = useState("Rooms");
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [notice, setNotice] = useState("");
 
-  // Save editor preferences in browser
+  // Save editor preferences
   useEffect(() => {
     localStorage.setItem("editorTheme", editorTheme);
     localStorage.setItem("editorFontSize", String(fontSize));
@@ -68,16 +64,14 @@ function App() {
     localStorage.setItem("editorMinimap", String(minimap));
   }, [editorTheme, fontSize, wordWrap, minimap]);
 
-  // Resize Monaco when switching pages or settings
+  // Resize editor when returning to Code
   useEffect(() => {
     if (activePage === "code" && editor) {
-      requestAnimationFrame(() => {
-        editor.layout();
-      });
+      requestAnimationFrame(() => editor.layout());
     }
   }, [activePage, editor, showEditorSettings]);
 
-  // Join form
+  // Join room
   const handleJoin = (event) => {
     event.preventDefault();
 
@@ -87,9 +81,7 @@ function App() {
     if (!name || !room) return;
 
     if (!/^[a-zA-Z0-9_-]{3,40}$/.test(room)) {
-      setError(
-        "Room ID must contain 3-40 letters, numbers, _ or -."
-      );
+      setError("Room ID must contain 3-40 letters, numbers, _ or -.");
       return;
     }
 
@@ -98,7 +90,7 @@ function App() {
     setRoomId(room);
   };
 
-  // Interview Socket.IO connection
+  // Socket.IO room connection
   useEffect(() => {
     if (!username || !roomId) return;
 
@@ -108,10 +100,7 @@ function App() {
     });
 
     socket.on("connect", () => {
-      socket.emit("interview:join", {
-        roomId,
-        username,
-      });
+      socket.emit("interview:join", { roomId, username });
     });
 
     socket.on("interview:joined", (data) => {
@@ -139,69 +128,47 @@ function App() {
       socket.disconnect();
     });
 
-    socket.on(
-      "interview:participant-joined",
-      ({ participant }) => {
-        setParticipants((previous) => {
-          if (
-            previous.some(
-              (user) => user.id === participant.id
-            )
-          ) {
-            return previous;
-          }
+    socket.on("interview:participant-joined", ({ participant }) => {
+      setParticipants((previous) => {
+        if (previous.some((user) => user.id === participant.id)) {
+          return previous;
+        }
+        return [...previous, participant];
+      });
+    });
 
-          return [...previous, participant];
-        });
-      }
-    );
+    socket.on("interview:participant-left", ({ socketId }) => {
+      setParticipants((previous) =>
+        previous.filter((user) => user.id !== socketId)
+      );
+    });
 
-    socket.on(
-      "interview:participant-left",
-      ({ socketId }) => {
-        setParticipants((previous) =>
-          previous.filter((user) => user.id !== socketId)
-        );
-      }
-    );
-
-    // Receive chat messages
     socket.on("interview:chat", (data) => {
       setMessages((previous) => [...previous, data]);
     });
 
-    // WHITEBOARD SOCKET EVENTS
-
+    // Whiteboard events
     socket.on("whiteboard:stroke-start", (stroke) => {
       setWhiteboardStrokes((previous) => {
         if (previous.some((item) => item.id === stroke.id)) {
           return previous;
         }
-
         return [...previous, stroke];
       });
     });
 
-    socket.on(
-      "whiteboard:stroke-point",
-      ({ strokeId, point }) => {
-        setWhiteboardStrokes((previous) =>
-          previous.map((stroke) =>
-            stroke.id === strokeId
-              ? {
-                  ...stroke,
-                  points: [...stroke.points, point],
-                }
-              : stroke
-          )
-        );
-      }
-    );
+    socket.on("whiteboard:stroke-point", ({ strokeId, point }) => {
+      setWhiteboardStrokes((previous) =>
+        previous.map((stroke) =>
+          stroke.id === strokeId
+            ? { ...stroke, points: [...stroke.points, point] }
+            : stroke
+        )
+      );
+    });
 
     socket.on("whiteboard:undo", () => {
-      setWhiteboardStrokes((previous) =>
-        previous.slice(0, -1)
-      );
+      setWhiteboardStrokes((previous) => previous.slice(0, -1));
     });
 
     socket.on("whiteboard:clear", () => {
@@ -221,7 +188,7 @@ function App() {
     };
   }, [username, roomId, SERVER_URL]);
 
-  // Yjs collaborative editor connection
+  // Yjs collaborative editor
   useEffect(() => {
     if (!joined || !interviewSocket || !editor) return;
 
@@ -229,9 +196,7 @@ function App() {
       SERVER_URL,
       roomId,
       ydoc,
-      {
-        autoConnect: true,
-      }
+      { autoConnect: true }
     );
 
     provider.awareness.setLocalStateField("user", {
@@ -240,7 +205,6 @@ function App() {
     });
 
     const model = editor.getModel();
-
     let binding = null;
 
     if (model) {
@@ -271,9 +235,7 @@ function App() {
 
   // Destroy Yjs document
   useEffect(() => {
-    return () => {
-      ydoc.destroy();
-    };
+    return () => ydoc.destroy();
   }, [ydoc]);
 
   // Send chat message
@@ -281,7 +243,6 @@ function App() {
     event.preventDefault();
 
     const message = chatInput.trim();
-
     if (!message || !interviewSocket) return;
 
     const data = {
@@ -291,11 +252,7 @@ function App() {
     };
 
     setMessages((previous) => [...previous, data]);
-
-    interviewSocket.emit("interview:chat", {
-      message,
-    });
-
+    interviewSocket.emit("interview:chat", { message });
     setChatInput("");
   };
 
@@ -306,10 +263,37 @@ function App() {
 
     try {
       await navigator.clipboard.writeText(link);
-      alert("Room link copied!");
+      setNotice("Room link copied successfully.");
     } catch {
-      setError("Unable to copy room link.");
+      setError("Unable to copy room link. Check browser permissions.");
     }
+  };
+
+  // End room / leave session
+  const handleEndRoom = () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to leave this interview room?"
+    );
+
+    if (!confirmed) return;
+
+    interviewSocket?.disconnect();
+
+    setInterviewSocket(null);
+    setJoined(false);
+    setUsername("");
+    setRoomId("");
+    setRole("");
+    setParticipants([]);
+    setMessages([]);
+    setWhiteboardStrokes([]);
+    setEditor(null);
+
+    window.history.replaceState(
+      {},
+      "",
+      window.location.pathname
+    );
   };
 
   // Reset editor settings
@@ -320,7 +304,7 @@ function App() {
     setMinimap(true);
   };
 
-  // Disable copy, cut and paste inside Monaco
+  // Monaco clipboard restriction
   const handleEditorMount = (instance) => {
     setEditor(instance);
 
@@ -358,18 +342,13 @@ function App() {
   // Join screen
   if (!username || !joined) {
     return (
-      <main className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <form
-          onSubmit={handleJoin}
-          className="flex flex-col gap-4 w-full max-w-sm bg-gray-900 p-6 rounded-xl"
-        >
-          <div className="text-center mb-2">
-         <h1 className="text-3xl font-bold text-white">
-         <span style={{ color: "red" }}>i</span>nterview-house
-        </h1>
-         </div>
+      <main className="join-screen">
+        <form className="join-card" onSubmit={handleJoin}>
+          <h1 className="brand-logo">
+            <span>i</span>nterview-house
+          </h1>
 
-          <p className="text-gray-400 text-center text-sm">
+          <p className="join-subtitle">
             Collaborative coding interview room
           </p>
 
@@ -378,33 +357,22 @@ function App() {
             placeholder="Enter your name"
             maxLength={30}
             required
-            className="p-3 rounded-lg bg-gray-800 text-white outline-none"
           />
 
           <input
             name="room"
             placeholder="Enter Room ID"
             defaultValue={
-              new URLSearchParams(
-                window.location.search
-              ).get("room") || ""
+              new URLSearchParams(window.location.search).get("room") || ""
             }
             minLength={3}
             maxLength={40}
             required
-            className="p-3 rounded-lg bg-gray-800 text-white outline-none"
           />
 
-          {error && (
-            <p className="text-red-400 text-sm">
-              {error}
-            </p>
-          )}
+          {error && <p className="error-message">{error}</p>}
 
-          <button
-            type="submit"
-            className="p-3 rounded-lg bg-amber-50 text-gray-950 font-bold"
-          >
+          <button type="submit" className="primary-button">
             Join Interview
           </button>
         </form>
@@ -412,40 +380,85 @@ function App() {
     );
   }
 
-  // Interview screen
   return (
-    <main className="min-h-screen bg-gray-950 text-white p-3">
-      <header className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">
-            <span style={{ color: "red" }} >i</span>nterview-house
-          </h1>
+    <main className="interview-app">
 
-          <p className="text-sm text-gray-400 mt-2">
-            Room: {roomId} | Role: {role}
-          </p>
+      {/* Top navigation */}
+      <nav className="top-navigation">
+        <h1 className="brand-logo">
+          <span>i</span>nterview-house
+        </h1>
+
+        <div className="nav-links">
+          <button
+            className={activeNav === "Rooms" ? "nav-link active" : "nav-link"}
+            onClick={() => setActiveNav("Rooms")}
+          >
+            <span>⌂</span> Rooms
+          </button>
+
+          <button
+            className={activeNav === "History" ? "nav-link active" : "nav-link"}
+            onClick={() => {
+              setActiveNav("History");
+              setNotice("Session history is not available in this version.");
+            }}
+          >
+            <span>◷</span> History
+          </button>
+
+          <button
+            className="nav-link"
+            onClick={() => setShowHowItWorks(true)}
+          >
+            <span>ⓘ</span> How it Works
+          </button>
         </div>
 
-        <button
-          onClick={copyRoomLink}
-          className="bg-blue-600 px-4 py-2 rounded-lg"
-        >
-          Copy Room Link
-        </button>
-      </header>
+        <div className="nav-right">
+          <div className="user-avatar">
+            {username.charAt(0).toUpperCase()}
+          </div>
+        </div>
+      </nav>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      {/* Room controls */}
+      <section className="room-toolbar">
+        <div className="room-information">
+          <span className="online-indicator"></span>
+          <strong>Room: {roomId}</strong>
+          <span className="room-separator">|</span>
+          <span>Role: {role}</span>
+        </div>
 
-        {/* Code / Draw Workspace */}
-        <section className="lg:col-span-2 bg-neutral-900 rounded-xl overflow-hidden workspace-panel">
+        <div className="room-actions">
+          <button
+            className="room-action-button copy-button"
+            onClick={copyRoomLink}
+          >
+            ↗ Copy Room Link
+          </button>
 
-          {/* Switch buttons */}
-          <div className="workspace-tabs">
+          <button
+            className="room-action-button end-button"
+            onClick={handleEndRoom}
+          >
+            ☎ End Room
+          </button>
+        </div>
+      </section>
+
+      {/* Main 65 / 35 layout */}
+      <div className="interview-layout">
+
+        {/* LEFT: Editor and whiteboard */}
+        <section className="workspace-panel redesigned-workspace">
+
+          {/* Code / Draw tabs */}
+          <div className="workspace-tabs redesigned-tabs">
             <button
               type="button"
-              className={`workspace-tab ${
-                activePage === "code" ? "active" : ""
-              }`}
+              className={`workspace-tab ${activePage === "code" ? "active" : ""}`}
               onClick={() => setActivePage("code")}
             >
               {"</>"} Code
@@ -453,51 +466,66 @@ function App() {
 
             <button
               type="button"
-              className={`workspace-tab ${
-                activePage === "draw" ? "active" : ""
-              }`}
+              className={`workspace-tab ${activePage === "draw" ? "active" : ""}`}
               onClick={() => setActivePage("draw")}
             >
               ✎ Draw
             </button>
           </div>
 
-          {/* Code page */}
+          {/* Code editor */}
           <div
-            className="workspace-content"
+            className="workspace-content code-workspace"
             style={{
-              display: activePage === "code" ? "block" : "none",
+              display: activePage === "code" ? "flex" : "none",
             }}
           >
-            {/* Editor header */}
-            <div className="editor-header">
-              <div className="editor-heading">
-                <span>Live Code Editor</span>
-
-                <span className="clipboard-note">
-                  Copy and paste disabled
-                </span>
+            <div className="editor-toolbar">
+              <div className="file-tab">
+                <span>main.js</span>
+                <span className="file-close">×</span>
               </div>
 
               <button
+                className="add-file-button"
                 type="button"
-                className="editor-settings-button"
+                title="New file (not enabled)"
                 onClick={() =>
-                  setShowEditorSettings(!showEditorSettings)
+                  setNotice("Multiple file management is not enabled yet.")
                 }
               >
-                ⚙ Editor Settings
+                +
               </button>
+
+              <div className="editor-toolbar-actions">
+                <button
+                  className="run-button"
+                  type="button"
+                  onClick={() =>
+                    setNotice("Code execution is not enabled yet.")
+                  }
+                >
+                  Run <span>▷</span>
+                </button>
+
+                <button
+                  className="settings-toolbar-button"
+                  type="button"
+                  onClick={() =>
+                    setShowEditorSettings(!showEditorSettings)
+                  }
+                >
+                  ⚙ Editor Settings
+                </button>
+              </div>
             </div>
 
-            {/* Editor settings panel */}
+            {/* Settings */}
             {showEditorSettings && (
-              <div className="editor-settings-panel">
+              <div className="editor-settings-panel redesigned-settings">
 
-                {/* Theme */}
                 <div className="editor-setting">
-                  <label>Editor Theme</label>
-
+                  <label>Theme</label>
                   <select
                     value={editorTheme}
                     onChange={(event) =>
@@ -509,12 +537,8 @@ function App() {
                   </select>
                 </div>
 
-                {/* Font size */}
                 <div className="editor-setting">
-                  <label>
-                    Font Size: {fontSize}px
-                  </label>
-
+                  <label>Font Size: {fontSize}px</label>
                   <input
                     type="range"
                     min="10"
@@ -526,10 +550,8 @@ function App() {
                   />
                 </div>
 
-                {/* Word wrap */}
                 <div className="editor-setting">
                   <label>Word Wrap</label>
-
                   <select
                     value={wordWrap}
                     onChange={(event) =>
@@ -541,10 +563,8 @@ function App() {
                   </select>
                 </div>
 
-                {/* Minimap */}
                 <div className="editor-setting">
                   <label>Minimap</label>
-
                   <label className="editor-toggle">
                     <input
                       type="checkbox"
@@ -553,53 +573,46 @@ function App() {
                         setMinimap(event.target.checked)
                       }
                     />
-                    <span>
-                      {minimap ? "Enabled" : "Disabled"}
-                    </span>
+                    <span>{minimap ? "Enabled" : "Disabled"}</span>
                   </label>
                 </div>
 
-                {/* Reset */}
                 <button
                   type="button"
                   className="editor-reset-button"
                   onClick={resetEditorSettings}
                 >
-                  Reset Settings
+                  Reset
                 </button>
               </div>
             )}
 
-            {/* Monaco Editor */}
-            <Editor
-              height="70vh"
-              defaultLanguage="javascript"
-              defaultValue="// Start coding here..."
-              theme={editorTheme}
-              options={{
-                readOnly: false,
-                contextmenu: false,
-                selectOnLineNumbers: true,
-                automaticLayout: true,
-
-                fontSize: fontSize,
-                wordWrap: wordWrap,
-
-                minimap: {
-                  enabled: minimap,
-                },
-
-                scrollBeyondLastLine: false,
-                smoothScrolling: true,
-                tabSize: 2,
-              }}
-              onMount={handleEditorMount}
-            />
+            <div className="monaco-container">
+              <Editor
+                height="100%"
+                defaultLanguage="javascript"
+                defaultValue="// Start coding here..."
+                theme={editorTheme}
+                options={{
+                  readOnly: false,
+                  contextmenu: false,
+                  selectOnLineNumbers: true,
+                  automaticLayout: true,
+                  fontSize,
+                  wordWrap,
+                  minimap: { enabled: minimap },
+                  scrollBeyondLastLine: false,
+                  smoothScrolling: true,
+                  tabSize: 2,
+                }}
+                onMount={handleEditorMount}
+              />
+            </div>
           </div>
 
-          {/* Drawing page */}
+          {/* Whiteboard */}
           <div
-            className="workspace-content"
+            className="workspace-content drawing-workspace"
             style={{
               display: activePage === "draw" ? "block" : "none",
             }}
@@ -612,33 +625,15 @@ function App() {
           </div>
         </section>
 
-        {/* Interview Sidebar */}
-        <aside className="flex flex-col gap-3">
+        {/* RIGHT: Video, participants, chat */}
+        <aside className="interview-sidebar">
 
-          {/* Participants */}
-          <section className="bg-white text-gray-900 rounded-xl p-3">
-            <h2 className="font-bold mb-2">
-              Participants ({participants.length}/2)
-            </h2>
+          {/* Video */}
+          <section className="sidebar-card video-card">
+            <div className="sidebar-card-heading">
+              <span>▣</span> Video Interview
+            </div>
 
-            {participants.map((participant) => (
-              <div
-                key={participant.id}
-                className="bg-gray-100 rounded-lg p-2 mb-2"
-              >
-                <p className="font-semibold">
-                  {participant.username}
-                </p>
-
-                <p className="text-sm text-gray-600">
-                  {participant.role}
-                </p>
-              </div>
-            ))}
-          </section>
-
-          {/* Video and Audio */}
-          <section className="bg-white text-gray-900 rounded-xl p-3">
             <VideoCall
               socket={interviewSocket}
               role={role}
@@ -646,59 +641,138 @@ function App() {
             />
           </section>
 
+          {/* Participants */}
+          <section className="sidebar-card participants-card">
+            <button
+              className="sidebar-card-heading collapsible-heading"
+              onClick={() => setShowParticipants(!showParticipants)}
+            >
+              <span>♧</span>
+              Participants ({participants.length})
+              <span className="collapse-arrow">
+                {showParticipants ? "⌄" : "›"}
+              </span>
+            </button>
+
+            {showParticipants && (
+              <div className="participant-list">
+                {participants.map((participant) => (
+                  <div className="participant-row" key={participant.id}>
+                    <div className="participant-avatar">
+                      {participant.username.charAt(0).toUpperCase()}
+                    </div>
+
+                    <div className="participant-details">
+                      <strong>
+                        {participant.username}
+                        {participant.id === interviewSocket?.id ? " (You)" : ""}
+                      </strong>
+                      <span>{participant.role}</span>
+                    </div>
+
+                    <span className="participant-mic">🎙</span>
+                  </div>
+                ))}
+
+                {participants.length === 0 && (
+                  <p className="empty-state">No participants yet.</p>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Chat */}
-          <section className="bg-white text-gray-900 rounded-xl p-3">
-            <h2 className="font-bold mb-2">
-              Interview Chat
-            </h2>
+          <section className="sidebar-card chat-card">
+            <div className="sidebar-card-heading">
+              <span>▤</span> Interview Chat
+            </div>
 
-            <div className="h-48 overflow-y-auto bg-gray-100 rounded-lg p-2 mb-3">
+            <div className="chat-messages">
               {messages.map((message, index) => (
-                <div
-                  key={`${message.time}-${index}`}
-                  className="mb-2"
-                >
-                  <p className="text-xs font-bold">
-                    {message.username}
-                  </p>
+                <div className="chat-message" key={`${message.time}-${index}`}>
+                  <div className="chat-avatar">
+                    {message.username.charAt(0).toUpperCase()}
+                  </div>
 
-                  <p className="text-sm break-words">
-                    {message.message}
-                  </p>
+                  <div className="chat-message-content">
+                    <div className="chat-message-heading">
+                      <strong>{message.username}</strong>
+                      <span>
+                        {message.time
+                          ? new Date(message.time).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : ""}
+                      </span>
+                    </div>
+                    <p>{message.message}</p>
+                  </div>
                 </div>
               ))}
 
               {messages.length === 0 && (
-                <p className="text-sm text-gray-500">
-                  No messages yet.
-                </p>
+                <p className="empty-state">No messages yet. Start a conversation.</p>
               )}
             </div>
 
-            <form
-              onSubmit={sendMessage}
-              className="flex gap-2"
-            >
+            <form className="chat-form" onSubmit={sendMessage}>
               <input
                 value={chatInput}
-                onChange={(event) =>
-                  setChatInput(event.target.value)
-                }
+                onChange={(event) => setChatInput(event.target.value)}
                 placeholder="Type a message..."
                 maxLength={1000}
-                className="min-w-0 flex-1 border rounded-lg p-2"
               />
 
-              <button
-                type="submit"
-                className="bg-blue-600 text-white px-3 rounded-lg"
-              >
-                Send
+              <button type="submit" disabled={!chatInput.trim()}>
+                ➤
               </button>
             </form>
           </section>
         </aside>
       </div>
+
+      {/* How it works dialog */}
+      {showHowItWorks && (
+        <div
+          className="dialog-overlay"
+          onClick={() => setShowHowItWorks(false)}
+        >
+          <div
+            className="how-dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              className="dialog-close"
+              onClick={() => setShowHowItWorks(false)}
+            >
+              ×
+            </button>
+
+            <h2>How interview-house works</h2>
+            <p>1. Share the room link with the candidate.</p>
+            <p>2. Collaborate using the shared code editor.</p>
+            <p>3. Use the Draw tab for diagrams and problem solving.</p>
+            <p>4. Communicate through video and interview chat.</p>
+            <p>5. End the room when the interview is complete.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Notifications */}
+      {(notice || error) && (
+        <div className={`app-notice ${error ? "notice-error" : ""}`}>
+          <span>{error || notice}</span>
+          <button
+            onClick={() => {
+              setNotice("");
+              setError("");
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </main>
   );
 }

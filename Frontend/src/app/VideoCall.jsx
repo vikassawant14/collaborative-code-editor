@@ -19,11 +19,10 @@ function VideoCall({ socket, role, participantCount }) {
 
     const startMedia = async () => {
       try {
-        const stream =
-          await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: true,
-          });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: true,
+        });
 
         if (!active) {
           stream.getTracks().forEach((track) => track.stop());
@@ -64,9 +63,7 @@ function VideoCall({ socket, role, participantCount }) {
         };
 
         peer.onconnectionstatechange = () => {
-          setConnected(
-            peer.connectionState === "connected"
-          );
+          setConnected(peer.connectionState === "connected");
         };
 
         setReady(true);
@@ -81,7 +78,6 @@ function VideoCall({ socket, role, participantCount }) {
 
     const handleSignal = async ({ type, data }) => {
       const peer = peerRef.current;
-
       if (!peer) return;
 
       try {
@@ -145,9 +141,9 @@ function VideoCall({ socket, role, participantCount }) {
       peerRef.current?.close();
       peerRef.current = null;
 
-      localStreamRef.current?.getTracks().forEach(
-        (track) => track.stop()
-      );
+      localStreamRef.current?.getTracks().forEach((track) => {
+        track.stop();
+      });
 
       localStreamRef.current = null;
     };
@@ -185,8 +181,7 @@ function VideoCall({ socket, role, participantCount }) {
   }, [participantCount, ready, role, socket]);
 
   const toggleMute = () => {
-    const track =
-      localStreamRef.current?.getAudioTracks()[0];
+    const track = localStreamRef.current?.getAudioTracks()[0];
 
     if (track) {
       track.enabled = !track.enabled;
@@ -195,8 +190,7 @@ function VideoCall({ socket, role, participantCount }) {
   };
 
   const toggleCamera = () => {
-    const track =
-      localStreamRef.current?.getVideoTracks()[0];
+    const track = localStreamRef.current?.getVideoTracks()[0];
 
     if (track) {
       track.enabled = !track.enabled;
@@ -205,69 +199,72 @@ function VideoCall({ socket, role, participantCount }) {
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      <h3 className="font-bold text-gray-900">
-        Video Interview
-      </h3>
+    <div className="video-call-content">
+      {error && <p className="video-error">{error}</p>}
 
-      {error && (
-        <p className="text-sm text-red-600">{error}</p>
-      )}
-
-      <div className="grid grid-cols-2 gap-2">
-        <div className="bg-gray-900 rounded-lg overflow-hidden">
+      <div className="video-grid">
+        <div className="video-tile">
           <video
             ref={localVideo}
             autoPlay
             muted
             playsInline
-            className="w-full aspect-video object-cover"
           />
-
-          <p className="text-white text-xs p-2">You</p>
+          {cameraOff && (
+            <div className="video-placeholder">Camera Off</div>
+          )}
+          <span className="video-label">You</span>
         </div>
 
-        <div className="bg-gray-900 rounded-lg overflow-hidden">
+        <div className="video-tile">
           <video
             ref={remoteVideo}
             autoPlay
             playsInline
-            className="w-full aspect-video object-cover"
           />
-
-          <p className="text-white text-xs p-2">
-            Other participant
-          </p>
+          <span className="video-label">Other Participant</span>
         </div>
       </div>
 
-      <p className="text-sm text-gray-600">
+      <p className="video-status">
         {!ready
           ? "Starting camera and microphone..."
           : connected
-            ? "Video call connected"
+            ? "● Connected"
             : "Waiting for the other participant..."}
       </p>
 
-      <div className="flex gap-2">
+      <div className="video-controls">
         <button
+          type="button"
           onClick={toggleMute}
           disabled={!ready}
-          className="flex-1 rounded-lg bg-gray-800 text-white p-2 disabled:opacity-50"
+          title={muted ? "Unmute microphone" : "Mute microphone"}
+          className={muted ? "video-control active" : "video-control"}
         >
-          {muted ? "Unmute" : "Mute"}
+          {muted ? "🔇" : "🎙"}
         </button>
 
         <button
+          type="button"
           onClick={toggleCamera}
           disabled={!ready}
-          className="flex-1 rounded-lg bg-gray-800 text-white p-2 disabled:opacity-50"
+          title={cameraOff ? "Turn camera on" : "Turn camera off"}
+          className={cameraOff ? "video-control active" : "video-control"}
         >
-          {cameraOff ? "Camera On" : "Camera Off"}
+          {cameraOff ? "▧" : "▣"}
         </button>
+
+        <div
+          className="video-control video-more"
+          title="More controls coming later"
+        >
+          •••
+        </div>
       </div>
     </div>
   );
 }
 
 export default VideoCall;
+
