@@ -9,7 +9,6 @@ import { SocketIOProvider } from "y-socket.io";
 import { io } from "socket.io-client";
 
 import VideoCall from "./VideoCall";
-import Whiteboard from "./Whiteboard";
 
 function App() {
   const SERVER_URL = import.meta.env.DEV
@@ -19,24 +18,26 @@ function App() {
   const ydoc = useMemo(() => new Y.Doc(), []);
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc]);
 
-  // Workspace
-  const [activePage, setActivePage] = useState("code");
-  const [whiteboardStrokes, setWhiteboardStrokes] = useState([]);
+  // Editor
   const [editor, setEditor] = useState(null);
 
   // Editor settings
   const [editorTheme, setEditorTheme] = useState(
     () => localStorage.getItem("editorTheme") || "vs-dark"
   );
+
   const [fontSize, setFontSize] = useState(
     () => Number(localStorage.getItem("editorFontSize")) || 14
   );
+
   const [wordWrap, setWordWrap] = useState(
     () => localStorage.getItem("editorWordWrap") || "on"
   );
+
   const [minimap, setMinimap] = useState(
     () => localStorage.getItem("editorMinimap") !== "false"
   );
+
   const [showEditorSettings, setShowEditorSettings] = useState(false);
 
   // Interview
@@ -64,12 +65,12 @@ function App() {
     localStorage.setItem("editorMinimap", String(minimap));
   }, [editorTheme, fontSize, wordWrap, minimap]);
 
-  // Resize editor when returning to Code
+  // Resize editor when settings change
   useEffect(() => {
-    if (activePage === "code" && editor) {
+    if (editor) {
       requestAnimationFrame(() => editor.layout());
     }
-  }, [activePage, editor, showEditorSettings]);
+  }, [editor, showEditorSettings]);
 
   // Join room
   const handleJoin = (event) => {
@@ -106,7 +107,7 @@ function App() {
     socket.on("interview:joined", (data) => {
       setRole(data.participant.role);
       setParticipants(data.participants);
-      setWhiteboardStrokes(data.whiteboardStrokes || []);
+
       setInterviewSocket(socket);
       setJoined(true);
       setError("");
@@ -133,6 +134,7 @@ function App() {
         if (previous.some((user) => user.id === participant.id)) {
           return previous;
         }
+
         return [...previous, participant];
       });
     });
@@ -147,34 +149,6 @@ function App() {
       setMessages((previous) => [...previous, data]);
     });
 
-    // Whiteboard events
-    socket.on("whiteboard:stroke-start", (stroke) => {
-      setWhiteboardStrokes((previous) => {
-        if (previous.some((item) => item.id === stroke.id)) {
-          return previous;
-        }
-        return [...previous, stroke];
-      });
-    });
-
-    socket.on("whiteboard:stroke-point", ({ strokeId, point }) => {
-      setWhiteboardStrokes((previous) =>
-        previous.map((stroke) =>
-          stroke.id === strokeId
-            ? { ...stroke, points: [...stroke.points, point] }
-            : stroke
-        )
-      );
-    });
-
-    socket.on("whiteboard:undo", () => {
-      setWhiteboardStrokes((previous) => previous.slice(0, -1));
-    });
-
-    socket.on("whiteboard:clear", () => {
-      setWhiteboardStrokes([]);
-    });
-
     socket.on("connect_error", () => {
       setError("Cannot connect to the interview server.");
     });
@@ -183,8 +157,6 @@ function App() {
 
     return () => {
       socket.disconnect();
-      setInterviewSocket(null);
-      setJoined(false);
     };
   }, [username, roomId, SERVER_URL]);
 
@@ -243,6 +215,7 @@ function App() {
     event.preventDefault();
 
     const message = chatInput.trim();
+
     if (!message || !interviewSocket) return;
 
     const data = {
@@ -252,7 +225,9 @@ function App() {
     };
 
     setMessages((previous) => [...previous, data]);
+
     interviewSocket.emit("interview:chat", { message });
+
     setChatInput("");
   };
 
@@ -286,7 +261,7 @@ function App() {
     setRole("");
     setParticipants([]);
     setMessages([]);
-    setWhiteboardStrokes([]);
+    setChatInput("");
     setEditor(null);
 
     window.history.replaceState(
@@ -304,7 +279,7 @@ function App() {
     setMinimap(true);
   };
 
-  // Monaco clipboard restriction
+  // Disable copy, cut and paste inside Monaco
   const handleEditorMount = (instance) => {
     setEditor(instance);
 
@@ -451,35 +426,12 @@ function App() {
       {/* Main 65 / 35 layout */}
       <div className="interview-layout">
 
-        {/* LEFT: Editor and whiteboard */}
+        {/* LEFT: Collaborative code editor */}
         <section className="workspace-panel redesigned-workspace">
 
-          {/* Code / Draw tabs */}
-          <div className="workspace-tabs redesigned-tabs">
-            <button
-              type="button"
-              className={`workspace-tab ${activePage === "code" ? "active" : ""}`}
-              onClick={() => setActivePage("code")}
-            >
-              {"</>"} Code
-            </button>
+          <div className="workspace-content code-workspace">
 
-            <button
-              type="button"
-              className={`workspace-tab ${activePage === "draw" ? "active" : ""}`}
-              onClick={() => setActivePage("draw")}
-            >
-              ✎ Draw
-            </button>
-          </div>
-
-          {/* Code editor */}
-          <div
-            className="workspace-content code-workspace"
-            style={{
-              display: activePage === "code" ? "flex" : "none",
-            }}
-          >
+            {/* Editor toolbar */}
             <div className="editor-toolbar">
               <div className="file-tab">
                 <span>main.js</span>
@@ -520,12 +472,13 @@ function App() {
               </div>
             </div>
 
-            {/* Settings */}
+            {/* Editor settings */}
             {showEditorSettings && (
               <div className="editor-settings-panel redesigned-settings">
 
                 <div className="editor-setting">
                   <label>Theme</label>
+
                   <select
                     value={editorTheme}
                     onChange={(event) =>
@@ -539,6 +492,7 @@ function App() {
 
                 <div className="editor-setting">
                   <label>Font Size: {fontSize}px</label>
+
                   <input
                     type="range"
                     min="10"
@@ -552,6 +506,7 @@ function App() {
 
                 <div className="editor-setting">
                   <label>Word Wrap</label>
+
                   <select
                     value={wordWrap}
                     onChange={(event) =>
@@ -565,6 +520,7 @@ function App() {
 
                 <div className="editor-setting">
                   <label>Minimap</label>
+
                   <label className="editor-toggle">
                     <input
                       type="checkbox"
@@ -587,6 +543,7 @@ function App() {
               </div>
             )}
 
+            {/* Monaco editor */}
             <div className="monaco-container">
               <Editor
                 height="100%"
@@ -609,20 +566,6 @@ function App() {
               />
             </div>
           </div>
-
-          {/* Whiteboard */}
-          <div
-            className="workspace-content drawing-workspace"
-            style={{
-              display: activePage === "draw" ? "block" : "none",
-            }}
-          >
-            <Whiteboard
-              socket={interviewSocket}
-              strokes={whiteboardStrokes}
-              setStrokes={setWhiteboardStrokes}
-            />
-          </div>
         </section>
 
         {/* RIGHT: Video, participants, chat */}
@@ -644,6 +587,7 @@ function App() {
           {/* Participants */}
           <section className="sidebar-card participants-card">
             <button
+              type="button"
               className="sidebar-card-heading collapsible-heading"
               onClick={() => setShowParticipants(!showParticipants)}
             >
@@ -667,6 +611,7 @@ function App() {
                         {participant.username}
                         {participant.id === interviewSocket?.id ? " (You)" : ""}
                       </strong>
+
                       <span>{participant.role}</span>
                     </div>
 
@@ -681,7 +626,7 @@ function App() {
             )}
           </section>
 
-          {/* Chat */}
+          {/* Interview chat */}
           <section className="sidebar-card chat-card">
             <div className="sidebar-card-heading">
               <span>▤</span> Interview Chat
@@ -689,7 +634,10 @@ function App() {
 
             <div className="chat-messages">
               {messages.map((message, index) => (
-                <div className="chat-message" key={`${message.time}-${index}`}>
+                <div
+                  className="chat-message"
+                  key={`${message.time}-${index}`}
+                >
                   <div className="chat-avatar">
                     {message.username.charAt(0).toUpperCase()}
                   </div>
@@ -697,6 +645,7 @@ function App() {
                   <div className="chat-message-content">
                     <div className="chat-message-heading">
                       <strong>{message.username}</strong>
+
                       <span>
                         {message.time
                           ? new Date(message.time).toLocaleTimeString([], {
@@ -706,13 +655,16 @@ function App() {
                           : ""}
                       </span>
                     </div>
+
                     <p>{message.message}</p>
                   </div>
                 </div>
               ))}
 
               {messages.length === 0 && (
-                <p className="empty-state">No messages yet. Start a conversation.</p>
+                <p className="empty-state">
+                  No messages yet. Start a conversation.
+                </p>
               )}
             </div>
 
@@ -750,11 +702,11 @@ function App() {
             </button>
 
             <h2>How interview-house works</h2>
+
             <p>1. Share the room link with the candidate.</p>
             <p>2. Collaborate using the shared code editor.</p>
-            <p>3. Use the Draw tab for diagrams and problem solving.</p>
-            <p>4. Communicate through video and interview chat.</p>
-            <p>5. End the room when the interview is complete.</p>
+            <p>3. Communicate through video and interview chat.</p>
+            <p>4. End the room when the interview is complete.</p>
           </div>
         </div>
       )}
@@ -763,6 +715,7 @@ function App() {
       {(notice || error) && (
         <div className={`app-notice ${error ? "notice-error" : ""}`}>
           <span>{error || notice}</span>
+
           <button
             onClick={() => {
               setNotice("");
@@ -778,3 +731,4 @@ function App() {
 }
 
 export default App;
+

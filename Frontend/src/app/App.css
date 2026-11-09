@@ -1,3 +1,4 @@
+/* Workspace tabs */
 
 /* =========================================
    INTERVIEW HOUSE - DARK NAVY / PURPLE UI
@@ -191,33 +192,12 @@
   background: #0c1322;
 }
 
-.redesigned-tabs {
-  padding: 10px 15px;
-  background: transparent;
-  border-bottom: 1px solid #2a344a;
-}
-
-.redesigned-tabs .workspace-tab {
-  min-width: 115px;
-  padding: 10px 17px;
-  border: 1px solid #39445d;
-  border-radius: 9px;
-  color: #e5e7eb;
-  background: #1a2438;
-  font-size: 14px;
-}
-
-.redesigned-tabs .workspace-tab.active {
-  color: white;
-  background: linear-gradient(135deg, #954cf5, #6732d3);
-  border-color: #a56bff;
-}
-
 /* Code workspace */
 
 .code-workspace {
   flex: 1;
   min-height: 0;
+  display: flex;
   flex-direction: column;
 }
 
@@ -348,14 +328,6 @@
   flex: 1;
   min-height: 65vh;
   width: 100%;
-}
-
-/* Whiteboard page */
-
-.drawing-workspace {
-  flex: 1;
-  min-height: 65vh;
-  background: #101827;
 }
 
 /* Right sidebar */
@@ -876,15 +848,6 @@
     font-size: 12px;
   }
 
-  .redesigned-tabs {
-    padding: 8px;
-  }
-
-  .redesigned-tabs .workspace-tab {
-    min-width: 90px;
-    padding: 9px;
-  }
-
   .editor-toolbar {
     flex-wrap: wrap;
     padding: 7px;
@@ -919,4 +882,3 @@
     gap: 7px;
   }
 }
-
